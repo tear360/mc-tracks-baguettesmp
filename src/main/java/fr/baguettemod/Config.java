@@ -16,6 +16,10 @@ public class Config {
     public static String CHANNEL_DEATHS = "";
     public static String CHANNEL_ADVANCEMENTS = "";
 
+    public static Path configDir() {
+        return CONFIG_DIR;
+    }
+
     public static void init() {
         try {
             Files.createDirectories(CONFIG_DIR);

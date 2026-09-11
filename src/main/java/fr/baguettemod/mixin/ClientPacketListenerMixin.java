@@ -2,6 +2,7 @@ package fr.baguettemod.mixin;
 
 import fr.baguettemod.BaguetteMod;
 import fr.baguettemod.DiscordBot;
+import fr.baguettemod.ScheduleTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
@@ -177,6 +178,7 @@ public abstract class ClientPacketListenerMixin {
             if (recentJoins.getOrDefault(id, 0L) > now - JOIN_LEAVE_DEDUP_WINDOW_MS) continue;
 
             recentJoins.put(id, now);
+            ScheduleTracker.playerJoined(id, name);
             DiscordBot.sendJoinMessage(name);
             BaguetteMod.LOGGER.info("[Join -> Discord] {}", name);
         }
@@ -194,6 +196,7 @@ public abstract class ClientPacketListenerMixin {
             if (recentLeaves.getOrDefault(id, 0L) > now - JOIN_LEAVE_DEDUP_WINDOW_MS) continue;
 
             recentLeaves.put(id, now);
+            ScheduleTracker.playerLeft(id);
             String name = cachedPlayerNames.remove(id);
             if (name == null) name = "joueur inconnu";
             DiscordBot.sendLeaveMessage(name);

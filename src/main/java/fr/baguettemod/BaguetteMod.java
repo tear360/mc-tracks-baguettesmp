@@ -10,6 +10,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ServerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.UUID;
 
 public class BaguetteMod implements ClientModInitializer {
     public static final String MOD_ID = "baguette-server-bot";
@@ -29,6 +30,7 @@ public class BaguetteMod implements ClientModInitializer {
 
         Config.init();
         Config.load();
+        ScheduleTracker.load();
 
         AutoUpdater.checkAndUpdate(version);
 
@@ -37,6 +39,7 @@ public class BaguetteMod implements ClientModInitializer {
 
         ClientLifecycleEvents.CLIENT_STOPPING.register(minecraft -> {
             if (active) {
+                ScheduleTracker.closeAllActiveSessions();
                 DiscordBot.stop();
                 active = false;
             }
@@ -57,6 +60,10 @@ public class BaguetteMod implements ClientModInitializer {
             LOGGER.info("[BaguetteMod] Connecte a '{}'. Activation du mod.", serverAddress);
             DiscordBot.start();
             String self = client.getUser().getName();
+            UUID selfId = client.getUser().getProfileId();
+            if (selfId != null) {
+                ScheduleTracker.playerJoined(selfId, self);
+            }
             DiscordBot.sendJoinMessage(self);
         } else {
             LOGGER.info("[BaguetteMod] Serveur '{}' != '{}'. Mod desactive.", serverAddress, TARGET_IP);
@@ -66,6 +73,7 @@ public class BaguetteMod implements ClientModInitializer {
     private void onDisconnect(ClientPacketListener handler, Minecraft client) {
         if (active) {
             String self = client.getUser().getName();
+            ScheduleTracker.closeAllActiveSessions();
             DiscordBot.sendLeaveMessage(self);
             DiscordBot.stop();
             active = false;

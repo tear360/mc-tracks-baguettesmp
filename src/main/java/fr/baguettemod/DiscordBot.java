@@ -139,6 +139,22 @@ public class DiscordBot {
         }
     }
 
+    public static void sendHorairesMessage(String content) {
+        if (content == null || content.isEmpty()) {
+            sendServerMessage("Joueur introuvable (pas encore observe).");
+            return;
+        }
+        try {
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setColor(new Color(0x9b59b6))
+                    .setTitle(":chart_with_upwards_trend: Horaires de connexion")
+                    .setDescription(content);
+            sendEmbed(Config.CHANNEL_CHAT, embed);
+        } catch (Throwable t) {
+            BaguetteMod.LOGGER.error("[BaguetteMod] Erreur sendHorairesMessage", t);
+        }
+    }
+
     private static String leavesChannelId() {
         return Config.CHANNEL_LEAVES.isEmpty() ? Config.CHANNEL_JOINS : Config.CHANNEL_LEAVES;
     }

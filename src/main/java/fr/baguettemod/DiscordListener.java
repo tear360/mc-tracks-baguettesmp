@@ -17,6 +17,11 @@ public class DiscordListener extends ListenerAdapter {
         if (!channelId.equals(Config.CHANNEL_CHAT)) return;
         if (message.isEmpty()) return;
 
+        if (message.trim().startsWith("!horaires")) {
+            handleHoraires(message);
+            return;
+        }
+
         Minecraft.getInstance().execute(() -> {
             if (!BaguetteMod.isActive()) return;
 
@@ -35,5 +40,16 @@ public class DiscordListener extends ListenerAdapter {
                 BaguetteMod.LOGGER.info("[Discord -> MC] <{}> {}", author, message);
             }
         });
+    }
+
+    private void handleHoraires(String raw) {
+        String rest = raw.substring("!horaires".length()).trim();
+        String content;
+        if (rest.isEmpty()) {
+            content = ScheduleTracker.directorySummary();
+        } else {
+            content = ScheduleTracker.playerSummary(rest);
+        }
+        DiscordBot.sendHorairesMessage(content);
     }
 }

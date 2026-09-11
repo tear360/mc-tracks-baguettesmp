@@ -16,7 +16,22 @@ Mod **Fabric** pour **Minecraft 26.2**, **CLIENT UNIQUEMENT**, qui relaye vers *
 | **Morts mondiales** | Salon deaths | La mort de **tout joueur** est relayée |
 | Morts avec position | Salon deaths | Si le joueur est dans le rayon de rendu : `X Y Z` + dimension |
 | Advancements mondiaux | Salon advancements | Les progrès de **tous** les joueurs sont relayés |
+| **Horaires de connexion** | Salon chat | `!horaires [joueur]` → présence par heure + plage la plus probable |
 | Auto-update | — | Vérifie les **releases GitHub** au démarrage et se met à jour au redémarrage |
+
+## Horaires de connexion (`!horaires`)
+
+Le mod enregistre en **temps réel** l'heure de connexion/déconnexion de **chaque joueur**
+(le tien inclus) et accumule les minutes de présence par heure de la journée (0h-23h).
+Les données sont persistées dans `config/baguette-server-bot/schedules.dat`.
+
+Dans le salon chat :
+
+- `!horaires` → classement des joueurs suivis par temps de présence (+ plage la plus probable de chacun).
+- `!horaires <pseudo>` → détail d'un joueur : minutes en ligne, heatmap des 24h,
+  plage de 2h la plus probable, top des heures de présence et des heures de connexion.
+
+Plus le mod tourne longtemps et souvent, plus les plages deviennent fiables.
 
 > **Position de mort** : le mod interprète côté client le packet `ClientboundEntityEventPacket` (event 3 = mort) et le packet
 > `ClientboundDamageEventPacket` (source du coup), puis calcule `X Y Z` via `entity.blockPosition()`. Aucun joueur n'a
