@@ -1,27 +1,25 @@
 package fr.baguettemod;
 
-import net.fabricmc.api.DedicatedServerModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.ServerData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
-
-public class BaguetteMod implements DedicatedServerModInitializer {
+public class BaguetteMod implements ClientModInitializer {
     public static final String MOD_ID = "baguette-server-bot";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final String TARGET_IP = "baguette.mine.fun";
     private static boolean active = false;
 
     @Override
-    public void onInitializeServer() {
-        LOGGER.info("[BaguetteMod] Chargement...");
+    public void onInitializeClient() {
+        LOGGER.info("[BaguetteMod] Chargement (client)...");
 
         String version = FabricLoader.getInstance()
                 .getModContainer(MOD_ID)
@@ -30,55 +28,48 @@ public class BaguetteMod implements DedicatedServerModInitializer {
         LOGGER.info("[BaguetteMod] Version : {}", version);
 
         Config.init();
-        AutoUpdater.checkAndUpdate(version);
-
-        ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
-        ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
-
-        ServerPlayConnectionEvents.JOIN.register(this::onPlayerJoin);
-        ServerPlayConnectionEvents.DISCONNECT.register(this::onPlayerLeave);
-    }
-
-    private void onServerStarting(MinecraftServer server) {
         Config.load();
 
-        String ip = server.getLocalIp();
-        if (ip == null) ip = "";
+        AutoUpdater.checkAndUpdate(version);
 
-        if (ip.equalsIgnoreCase(TARGET_IP) || ip.contains(TARGET_IP)) {
+        ClientPlayConnectionEvents.JOIN.register(this::onJoin);
+        ClientPlayConnectionEvents.DISCONNECT.register(this::onDisconnect);
+
+        ClientLifecycleEvents.CLIENT_STOPPING.register(minecraft -> {
+            if (active) {
+                DiscordBot.stop();
+                active = false;
+            }
+        });
+    }
+
+    private void onJoin(ClientPacketListener handler, PacketSender sender, Minecraft client) {
+        ServerData serverData = handler.getServerData();
+        if (serverData == null) {
+            serverData = client.getCurrentServer();
+        }
+
+        String serverName = serverData != null ? serverData.name : "";
+        if (serverName == null) serverName = "";
+
+        if (serverName.toLowerCase().contains(TARGET_IP)) {
             active = true;
-            LOGGER.info("[BaguetteMod] IP detectee : {}. Activation du mod.", ip);
+            LOGGER.info("[BaguetteMod] Connecte a '{}'. Activation du mod.", serverName);
             DiscordBot.start();
+            String self = client.getUser().getName();
+            DiscordBot.sendJoinMessage(self);
         } else {
-            LOGGER.info("[BaguetteMod] IP '{}' ne correspond pas a '{}'. Mod desactive.", ip, TARGET_IP);
+            LOGGER.info("[BaguetteMod] Serveur '{}' != '{}'. Mod desactive.", serverName, TARGET_IP);
         }
     }
 
-    private void onServerStopping(MinecraftServer server) {
+    private void onDisconnect(ClientPacketListener handler, Minecraft client) {
         if (active) {
+            String self = client.getUser().getName();
+            DiscordBot.sendLeaveMessage(self);
             DiscordBot.stop();
-            LOGGER.info("[BaguetteMod] Arrete.");
-        }
-    }
-
-    private void onPlayerJoin(ServerGamePacketListenerImpl handler, PacketSender sender, MinecraftServer server) {
-        if (!active) return;
-
-        ServerPlayer player = handler.player;
-        if (player == null) return;
-
-        String name = player.getName().getString();
-        LOGGER.info("[Join] {} a rejoint le serveur.", name);
-        DiscordBot.sendJoinMessage(name);
-    }
-
-    private void onPlayerLeave(ServerGamePacketListenerImpl handler, MinecraftServer server) {
-        if (!active) return;
-
-        if (handler.player != null) {
-            String name = handler.player.getName().getString();
-            LOGGER.info("[Leave] {} a quitte le serveur.", name);
-            DiscordBot.sendLeaveMessage(name);
+            active = false;
+            LOGGER.info("[BaguetteMod] Deconnecte. Mod desactive.");
         }
     }
 

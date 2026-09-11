@@ -17,8 +17,8 @@ import com.google.gson.JsonParser;
 
 public class AutoUpdater {
     private static final String GITHUB_API = "https://api.github.com/repos/tear360/mc-tracks-baguettesmp/releases/latest";
-    private static final String REPO_URL = "https://github.com/tear360/mc-tracks-baguettesmp/releases";
     private static final HttpClient httpClient = HttpClient.newHttpClient();
+    private static boolean updatePending = false;
 
     public static void checkAndUpdate(String currentVersion) {
         CompletableFuture.runAsync(() -> {
@@ -41,30 +41,29 @@ public class AutoUpdater {
                 JsonObject release = JsonParser.parseString(response.body()).getAsJsonObject();
                 String latestTag = release.get("tag_name").getAsString().replace("v", "");
 
-                if (isNewerVersion(currentVersion, latestTag)) {
-                    BaguetteMod.LOGGER.info("[AutoUpdate] Nouvelle version disponible : {} (actuelle : {})", latestTag, currentVersion);
+                if (!isNewerVersion(currentVersion, latestTag)) {
+                    BaguetteMod.LOGGER.info("[AutoUpdate] A jour (version {}).", currentVersion);
+                    return;
+                }
 
-                    JsonArray assets = release.getAsJsonArray("assets");
-                    if (assets == null || assets.isEmpty()) {
-                        BaguetteMod.LOGGER.warn("[AutoUpdate] Aucun asset trouve dans la release {}", latestTag);
+                JsonArray assets = release.getAsJsonArray("assets");
+                if (assets == null || assets.isEmpty()) {
+                    BaguetteMod.LOGGER.warn("[AutoUpdate] Aucun asset dans la release {}", latestTag);
+                    return;
+                }
+
+                for (int i = 0; i < assets.size(); i++) {
+                    JsonObject asset = assets.get(i).getAsJsonObject();
+                    String name = asset.get("name").getAsString();
+
+                    if (name.endsWith(".jar") && name.contains("baguette-server-bot")) {
+                        String downloadUrl = asset.get("browser_download_url").getAsString();
+                        downloadAndSchedule(downloadUrl, latestTag);
                         return;
                     }
-
-                    for (int i = 0; i < assets.size(); i++) {
-                        JsonObject asset = assets.get(i).getAsJsonObject();
-                        String name = asset.get("name").getAsString();
-
-                        if (name.endsWith(".jar") && name.contains("baguette-server-bot")) {
-                            String downloadUrl = asset.get("browser_download_url").getAsString();
-                            downloadAndUpdate(downloadUrl, name, latestTag);
-                            return;
-                        }
-                    }
-
-                    BaguetteMod.LOGGER.warn("[AutoUpdate] Aucun jar trouve dans la release {}", latestTag);
-                } else {
-                    BaguetteMod.LOGGER.info("[AutoUpdate] A jour (version {}).", currentVersion);
                 }
+
+                BaguetteMod.LOGGER.warn("[AutoUpdate] Aucun jar dans la release {}", latestTag);
 
             } catch (Exception e) {
                 BaguetteMod.LOGGER.error("[AutoUpdate] Erreur lors de la verification.", e);
@@ -72,9 +71,10 @@ public class AutoUpdater {
         });
     }
 
-    private static void downloadAndUpdate(String downloadUrl, String fileName, String newVersion) {
+    private static void downloadAndSchedule(String downloadUrl, String newVersion) {
         try {
-            BaguetteMod.LOGGER.info("[AutoUpdate] Telechargement de {}...", fileName);
+            Path currentJar = findCurrentJar();
+            BaguetteMod.LOGGER.info("[AutoUpdate] Nouvelle version disponible : {}. Telechargement...", newVersion);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(downloadUrl))
@@ -89,28 +89,43 @@ public class AutoUpdater {
                 return;
             }
 
-            Path tempFile = Files.createTempFile("baguette-update-", ".jar");
-            Files.copy(response.body(), tempFile, StandardCopyOption.REPLACE_EXISTING);
+            Path updateFile = currentJar.resolveSibling("baguette-server-bot-update.jar");
+            Files.copy(response.body(), updateFile, StandardCopyOption.REPLACE_EXISTING);
 
-            Path currentJar = Path.of(System.getProperty("java.class.path"));
-            if (currentJar.toString().endsWith(".jar") && Files.exists(currentJar)) {
-                Path backup = currentJar.resolveSibling(currentJar.getFileName() + ".bak");
-                Files.copy(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
+            updatePending = true;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> applyUpdate(currentJar, updateFile)));
 
-                Files.move(tempFile, currentJar, StandardCopyOption.REPLACE_EXISTING);
-
-                BaguetteMod.LOGGER.info("=========================================");
-                BaguetteMod.LOGGER.info("[AutoUpdate] Mod mis a jour vers la version {} !", newVersion);
-                BaguetteMod.LOGGER.info("[AutoUpdate] Redemarrez le serveur pour appliquer.");
-                BaguetteMod.LOGGER.info("[AutoUpdate] Ancienne version sauvegardee : {}", backup.getFileName());
-                BaguetteMod.LOGGER.info("=========================================");
-            } else {
-                BaguetteMod.LOGGER.warn("[AutoUpdate] Chemin du jar actuel invalide : {}", currentJar);
-                Files.deleteIfExists(tempFile);
-            }
+            BaguetteMod.LOGGER.info("=========================================");
+            BaguetteMod.LOGGER.info("[AutoUpdate] Mise a jour vers {} telechargee.", newVersion);
+            BaguetteMod.LOGGER.info("[AutoUpdate] Redemarrez Minecraft pour l'appliquer.");
+            BaguetteMod.LOGGER.info("=========================================");
 
         } catch (IOException | InterruptedException e) {
             BaguetteMod.LOGGER.error("[AutoUpdate] Erreur lors du telechargement.", e);
+        }
+    }
+
+    private static void applyUpdate(Path currentJar, Path updateFile) {
+        if (!updatePending || !Files.exists(updateFile)) return;
+
+        try {
+            BaguetteMod.LOGGER.info("[AutoUpdate] Application de la mise a jour...");
+            Files.deleteIfExists(currentJar);
+            Files.move(updateFile, currentJar, StandardCopyOption.REPLACE_EXISTING);
+            BaguetteMod.LOGGER.info("[AutoUpdate] Mod mis a jour ! Le nouveau jar est actif au prochain lancement.");
+        } catch (IOException e) {
+            BaguetteMod.LOGGER.warn("[AutoUpdate] Impossible de remplacer le mod automatiquement (fichier utilise).");
+            BaguetteMod.LOGGER.warn("[AutoUpdate] Supprimez manuellement l'ancien mod puis renommez : {}",
+                    updateFile.getFileName());
+        }
+    }
+
+    private static Path findCurrentJar() {
+        try {
+            return Path.of(BaguetteMod.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (Exception e) {
+            BaguetteMod.LOGGER.warn("[AutoUpdate] Impossible de localiser le jar du mod.");
+            return Path.of("mods", "baguette-server-bot.jar");
         }
     }
 

@@ -3,14 +3,14 @@
     "id": "baguette-server-bot",
     "version": "${version}",
     "name": "Baguette Server Bot",
-    "description": "Envoie les messages du serveur Minecraft vers Discord",
+    "description": "Bridge Discord pour le serveur Baguette SMP (mod CLIENT uniquement)",
     "authors": ["BaguetteMod"],
     "contact": {},
     "license": "MIT",
     "icon": "",
-    "environment": "server",
+    "environment": "client",
     "entrypoints": {
-        "server": ["fr.baguettemod.BaguetteMod"]
+        "client": ["fr.baguettemod.BaguetteMod"]
     },
     "mixins": ["baguette-server-bot.mixins.json"],
     "depends": {
