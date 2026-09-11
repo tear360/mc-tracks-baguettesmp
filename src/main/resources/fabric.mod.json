@@ -1,0 +1,22 @@
+{
+    "schemaVersion": 1,
+    "id": "baguette-server-bot",
+    "version": "${version}",
+    "name": "Baguette Server Bot",
+    "description": "Envoie les messages du serveur Minecraft vers Discord",
+    "authors": ["BaguetteMod"],
+    "contact": {},
+    "license": "MIT",
+    "icon": "",
+    "environment": "server",
+    "entrypoints": {
+        "server": ["fr.baguettemod.BaguetteMod"]
+    },
+    "mixins": ["baguette-server-bot.mixins.json"],
+    "depends": {
+        "fabricloader": ">=0.19.0",
+        "minecraft": "~26.2",
+        "java": ">=25",
+        "fabric-api": "*"
+    }
+}

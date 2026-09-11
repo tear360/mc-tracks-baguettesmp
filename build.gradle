@@ -1,0 +1,58 @@
+plugins {
+    id "net.fabricmc.fabric-loom" version "1.17.20"
+    id "maven-publish"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+}
+
+configurations {
+    discordRuntime
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    implementation "net.dv8tion:JDA:${project.jda_version}"
+
+    discordRuntime("net.dv8tion:JDA:${project.jda_version}") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "club.minnced", module: "opus-java"
+        exclude group: "com.google.guava", module: "guava"
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+    withSourcesJar()
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.discordRuntime.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}

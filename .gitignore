@@ -1,0 +1,12 @@
+.gradle/
+build/
+*.log
+config/
+.idea/
+*.iml
+out/
+.env
+*.env
+build_log.txt
+deps_log.txt
+printdeps.gradle
