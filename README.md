@@ -8,20 +8,26 @@ Mod **Fabric** pour **Minecraft 26.2**, **CLIENT UNIQUEMENT**, qui relaye vers *
 
 | Fonctionnalité | Salon Discord | Description |
 |---|---|---|
-| Chat que VOUS envoyez | Salon chat | Chaque message que vous écrivez dans le chat est relayé |
-| Chat des autres joueurs | Salon chat | Les messages des autres (à portée) sont relayés |
+| Chat de TOUS les joueurs | Salon chat | Chaque message envoyé est relayé (le serveur diffuse tous les messages) |
 | Commandes que VOUS exécutez | Salon commandes | Chaque commande (ex. `/tp`, `/home`) est loguée |
 | Discord → Minecraft | Salon chat | Un message du bot est envoyé dans le chat du serveur |
 | Discord → Commande | Salon chat | Un message commençant par `/` exécute la commande |
-| Connexions / Déconnexions | Salon joins | Joins/leaves de vous et des autres joueurs visibles |
-| **Morts avec position** | Salon deaths | S'écrit quand UN joueur meurt, avec les **coordonnées X Y Z** + la dimension |
-| Event de mort | — | Détecté via le packet d'événement d'entité (code 3) du client |
+| Connexions / Déconnexions mondiales | Salon joins | Joins/leaves de **tous** les joueurs (paquet PlayerInfo) |
+| **Morts mondiales** | Salon deaths | La mort de **tout joueur** est relayée |
+| Morts avec position | Salon deaths | Si le joueur est dans le rayon de rendu : `X Y Z` + dimension |
+| Advancements mondiaux | Salon advancements | Les progrès de **tous** les joueurs sont relayés |
 | Auto-update | — | Vérifie les **releases GitHub** au démarrage et se met à jour au redémarrage |
 
 > **Position de mort** : le mod interprète côté client le packet `ClientboundEntityEventPacket` (event 3 = mort) et le packet
 > `ClientboundDamageEventPacket` (source du coup), puis calcule `X Y Z` via `entity.blockPosition()`. Aucun joueur n'a
-> besoin d'être **OP** : tout ce que le client voit est suffisant.
-> ⚠️ Limite inhérente : seules les morts **à portée de rendu** du joueur qui a le mod sont détectées.
+> besoin d'être **OP**.
+>
+> **Morts hors rayon de rendu** : chaque mort étant diffusée à tous les joueurs via `ClientboundSystemChatPacket`
+> (clé `death.attack.*`), le mod la capte aussi — mais **sans position** (inconnaissable en client-only).
+> Une déduplication de 5 s évite les doublons avec l'event d'entité (qui, lui, porte la position et arrive en premier).
+>
+> ⚠️ Limites inhérentes au client-only : les **commandes des autres joueurs** ne sont pas visibles, et la
+> **position de mort** n'existe que pour les joueurs dans le rayon de rendu.
 
 ## Exemple de message de mort sur Discord
 
@@ -128,8 +134,10 @@ src/main/java/fr/baguettemod/
 | Votre chat | `ClientPacketListener.sendChat(String)` | — |
 | Vos commandes | `ClientPacketListener.sendCommand(String)` | — |
 | Chat des autres | `ClientPacketListener.handlePlayerChat` | `ClientboundPlayerChatPacket` |
-| Mort (signal) | `ClientPacketListener.handleEntityEvent` | `ClientboundEntityEventPacket` (event 3) |
+| Mort (signal, à portée) | `ClientPacketListener.handleEntityEvent` | `ClientboundEntityEventPacket` (event 3) |
 | Source de la mort | `ClientPacketListener.handleDamageEvent` | `ClientboundDamageEventPacket` |
+| Mort mondiale (hors portée) | `ClientPacketListener.handleSystemChat` | `ClientboundSystemChatPacket` (clé `death.attack.*`) |
+| Advancement mondial | `ClientPacketListener.handleSystemChat` | `ClientboundSystemChatPacket` (clé `chat.type.advancement.*`) |
 | Join des autres | `ClientPacketListener.handlePlayerInfoUpdate` | `Action.ADD_PLAYER` |
 | Leave des autres | `ClientPacketListener.handlePlayerInfoRemove` | `ClientboundPlayerInfoRemovePacket` |
 
@@ -140,9 +148,9 @@ src/main/java/fr/baguettemod/
 gradlew.bat build
 
 # 2. Tag + release :
-git tag -a v1.2.0 -m "v1.2.0"
-git push origin v1.2.0
-gh release create v1.2.0 .\build\libs\baguette-server-bot-1.2.0.jar --repo tear360/mc-tracks-baguettesmp --title "v1.2.0"
+git tag -a v1.3.0 -m "v1.3.0"
+git push origin v1.3.0
+gh release create v1.3.0 .\build\libs\baguette-server-bot-1.3.0.jar --repo tear360/mc-tracks-baguettesmp --title "v1.3.0"
 ```
 
 Les clients se mettront à jour automatiquement au redémarrage suivant.
