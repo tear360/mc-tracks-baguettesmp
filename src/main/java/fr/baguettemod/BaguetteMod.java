@@ -49,17 +49,17 @@ public class BaguetteMod implements ClientModInitializer {
             serverData = client.getCurrentServer();
         }
 
-        String serverName = serverData != null ? serverData.name : "";
-        if (serverName == null) serverName = "";
+        String serverAddress = serverData != null ? serverData.ip : "";
+        if (serverAddress == null) serverAddress = "";
 
-        if (serverName.toLowerCase().contains(TARGET_IP)) {
+        if (serverAddress.toLowerCase().contains(TARGET_IP)) {
             active = true;
-            LOGGER.info("[BaguetteMod] Connecte a '{}'. Activation du mod.", serverName);
+            LOGGER.info("[BaguetteMod] Connecte a '{}'. Activation du mod.", serverAddress);
             DiscordBot.start();
             String self = client.getUser().getName();
             DiscordBot.sendJoinMessage(self);
         } else {
-            LOGGER.info("[BaguetteMod] Serveur '{}' != '{}'. Mod desactive.", serverName, TARGET_IP);
+            LOGGER.info("[BaguetteMod] Serveur '{}' != '{}'. Mod desactive.", serverAddress, TARGET_IP);
         }
     }
 
