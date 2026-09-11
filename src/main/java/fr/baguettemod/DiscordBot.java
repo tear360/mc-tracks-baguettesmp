@@ -64,8 +64,15 @@ public class DiscordBot {
         sendMessage(Config.CHANNEL_JOINS, ":red_circle: **" + playerName + "** a quitte le serveur.");
     }
 
-    public static void sendDeathMessage(String deathMessage) {
-        sendMessage(Config.CHANNEL_DEATHS, ":skull: " + deathMessage);
+    public static void sendDeathMessage(String deathMessage, int x, int y, int z, String dimension) {
+        String dim = switch (dimension) {
+            case "minecraft:overworld" -> "Overworld";
+            case "minecraft:the_end" -> "The End";
+            case "minecraft:the_nether" -> "Nether";
+            default -> dimension;
+        };
+        sendMessage(Config.CHANNEL_DEATHS,
+                ":skull: " + deathMessage + "\n:round_pushpin: **Position de la mort :** `" + x + ", " + y + ", " + z + "` (" + dim + ")");
     }
 
     public static void sendCommandMessage(String playerName, String command) {

@@ -18,8 +18,12 @@ public abstract class ServerPlayerMixin {
 
         ServerPlayer self = (ServerPlayer) (Object) this;
         String deathMsg = self.getCombatTracker().getDeathMessage().getString();
+        int x = self.getBlockX();
+        int y = self.getBlockY();
+        int z = self.getBlockZ();
+        String dimension = self.level().dimension().identifier().toString();
 
-        BaguetteMod.LOGGER.info("[Mort] {}", deathMsg);
-        DiscordBot.sendDeathMessage(deathMsg);
+        BaguetteMod.LOGGER.info("[Mort] {} (X:{}, Y:{}, Z:{}, {})", deathMsg, x, y, z, dimension);
+        DiscordBot.sendDeathMessage(deathMsg, x, y, z, dimension);
     }
 }
