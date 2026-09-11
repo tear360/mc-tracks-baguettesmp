@@ -104,7 +104,7 @@ public abstract class ClientPacketListenerMixin {
         reportedDeaths.put(player.getName().getString(), System.currentTimeMillis());
 
         BaguetteMod.LOGGER.info("[Mort -> Discord] {} (X:{}, Y:{}, Z:{}, {})", deathMessage, x, y, z, dimension);
-        DiscordBot.sendDeathMessage(deathMessage, x, y, z, dimension);
+        DiscordBot.sendDeathMessage(deathMessage, player.getName().getString(), x, y, z, dimension);
     }
 
     @Inject(method = "handleSystemChat", at = @At("HEAD"))
@@ -129,8 +129,8 @@ public abstract class ClientPacketListenerMixin {
             reportedDeaths.put(victim, now);
 
             String deathMessage = content.getString();
-            BaguetteMod.LOGGER.info("[Mort (monde) -> Discord] {}", deathMessage);
-            DiscordBot.sendDeathMessage(deathMessage);
+            BaguetteMod.LOGGER.info("[Mort (monde) -> Discord] {} (par {})", deathMessage, victim);
+            DiscordBot.sendDeathMessage(deathMessage, victim);
         } else if (key.startsWith("chat.type.advancement.")) {
             String player = argAsString(translatable, 0, "un joueur");
             String advancement = argAsString(translatable, 1, "un progres");

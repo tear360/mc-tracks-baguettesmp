@@ -36,11 +36,11 @@ public class Config {
                 props.load(fis);
             }
 
-            DISCORD_TOKEN = props.getProperty("discord_token", "");
-            CHANNEL_CHAT = props.getProperty("channel_chat", "");
-            CHANNEL_JOINS = props.getProperty("channel_joins", "");
-            CHANNEL_DEATHS = props.getProperty("channel_deaths", "");
-            CHANNEL_ADVANCEMENTS = props.getProperty("channel_advancements", "");
+            DISCORD_TOKEN = props.getProperty("discord_token", "").trim();
+            CHANNEL_CHAT = props.getProperty("channel_chat", "").trim();
+            CHANNEL_JOINS = props.getProperty("channel_joins", "").trim();
+            CHANNEL_DEATHS = props.getProperty("channel_deaths", "").trim();
+            CHANNEL_ADVANCEMENTS = props.getProperty("channel_advancements", "").trim();
 
             BaguetteMod.LOGGER.info("[BaguetteMod] Configuration chargee.");
 
