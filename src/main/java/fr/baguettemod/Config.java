@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 
 public class Config {
-    private static final Path CONFIG_DIR = Path.of("config/baguette-server-bot");
+    private static final Path CONFIG_DIR = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("baguette-server-bot");
     private static final Path CONFIG_FILE = CONFIG_DIR.resolve("config.properties");
 
     public static String DISCORD_TOKEN = "";
@@ -16,14 +16,22 @@ public class Config {
     public static String CHANNEL_COMMANDS = "";
     public static String CHANNEL_ADVANCEMENTS = "";
 
-    public static void load() {
+    public static void init() {
         try {
             Files.createDirectories(CONFIG_DIR);
 
             if (!Files.exists(CONFIG_FILE)) {
                 createDefault();
+            } else {
+                BaguetteMod.LOGGER.info("[BaguetteMod] Fichier de config : {}", CONFIG_FILE.toAbsolutePath());
             }
+        } catch (IOException e) {
+            BaguetteMod.LOGGER.error("[BaguetteMod] Erreur lors de la creation de la config.", e);
+        }
+    }
 
+    public static void load() {
+        try {
             Properties props = new Properties();
             try (FileInputStream fis = new FileInputStream(CONFIG_FILE.toFile())) {
                 props.load(fis);

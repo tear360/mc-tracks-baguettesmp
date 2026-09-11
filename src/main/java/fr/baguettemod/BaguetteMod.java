@@ -29,23 +29,25 @@ public class BaguetteMod implements DedicatedServerModInitializer {
                 .orElse("unknown");
         LOGGER.info("[BaguetteMod] Version : {}", version);
 
+        Config.init();
+        AutoUpdater.checkAndUpdate(version);
+
         ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
 
         ServerPlayConnectionEvents.JOIN.register(this::onPlayerJoin);
         ServerPlayConnectionEvents.DISCONNECT.register(this::onPlayerLeave);
-
-        AutoUpdater.checkAndUpdate(version);
     }
 
     private void onServerStarting(MinecraftServer server) {
+        Config.load();
+
         String ip = server.getLocalIp();
         if (ip == null) ip = "";
 
         if (ip.equalsIgnoreCase(TARGET_IP) || ip.contains(TARGET_IP)) {
             active = true;
             LOGGER.info("[BaguetteMod] IP detectee : {}. Activation du mod.", ip);
-            Config.load();
             DiscordBot.start();
         } else {
             LOGGER.info("[BaguetteMod] IP '{}' ne correspond pas a '{}'. Mod desactive.", ip, TARGET_IP);

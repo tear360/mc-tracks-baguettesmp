@@ -36,6 +36,12 @@ Mod **Fabric** pour **Minecraft 26.2** qui relie votre serveur à **Discord**, u
 2. Placez-le dans le dossier `mods/` du serveur.
 3. Créez le dossier `config/baguette-server-bot/` et dedans un fichier `config.properties` :
 
+> Le mod **crée automatiquement** ce dossier et ce fichier au premier démarrage.
+> Son emplacement exact dépend de votre lanceur : dossier `server/` (serveur dédié)
+> ou dossier `config/` à côté de `.minecraft` — **en production c'est la racine du dossier du serveur**,
+> à côté de `mods/`. Le chemin exact est affiché dans les logs du serveur au démarrage
+> (`Fichier de config : ...`).
+
 ```properties
 # Token du bot Discord
 discord_token=METTRE_TOKEN_ICI
