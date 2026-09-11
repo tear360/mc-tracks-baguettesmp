@@ -8,8 +8,7 @@ Mod **Fabric** pour **Minecraft 26.2**, **CLIENT UNIQUEMENT**, qui relaye vers *
 
 | Fonctionnalité | Salon Discord | Description |
 |---|---|---|
-| Chat de TOUS les joueurs | Salon chat | Chaque message envoyé est relayé (le serveur diffuse tous les messages) |
-| Commandes que VOUS exécutez | Salon commandes | Chaque commande (ex. `/tp`, `/home`) est loguée |
+| Chat de TOUS les joueurs | Salon chat | Chaque message envoyé est relayé (via `handleDisguisedChat` + `sendChat`) |
 | Discord → Minecraft | Salon chat | Un message du bot est envoyé dans le chat du serveur |
 | Discord → Commande | Salon chat | Un message commençant par `/` exécute la commande |
 | Connexions / Déconnexions mondiales | Salon joins | Joins/leaves de **tous** les joueurs (paquet PlayerInfo) |
@@ -25,6 +24,9 @@ Mod **Fabric** pour **Minecraft 26.2**, **CLIENT UNIQUEMENT**, qui relaye vers *
 > **Morts hors rayon de rendu** : chaque mort étant diffusée à tous les joueurs via `ClientboundSystemChatPacket`
 > (clé `death.attack.*`), le mod la capte aussi — mais **sans position** (inconnaissable en client-only).
 > Une déduplication de 5 s évite les doublons avec l'event d'entité (qui, lui, porte la position et arrive en premier).
+>
+> **Chat des autres joueurs** : le serveur envoie le chat des autres en *disguised chat*
+> (`ClientboundDisguisedChatPacket`) — le mod les parse (`<nom> message`) et les relaye.
 >
 > ⚠️ Limites inhérentes au client-only : les **commandes des autres joueurs** ne sont pas visibles, et la
 > **position de mort** n'existe que pour les joueurs dans le rayon de rendu.
@@ -70,7 +72,6 @@ discord_token=METTRE_TOKEN_ICI
 channel_chat=ID_DU_SALON_CHAT
 channel_joins=ID_DU_SALON_JOINS
 channel_deaths=ID_DU_SALON_DEATHS
-channel_commands=ID_DU_SALON_COMMANDS
 channel_advancements=ID_DU_SALON_ADVANCEMENTS
 ```
 
@@ -124,7 +125,7 @@ src/main/java/fr/baguettemod/
 ├── DiscordBot.java                    # Client JDA + envoi par salon
 ├── DiscordListener.java               # Bridge Discord → Minecraft (sendChat/sendCommand)
 └── mixin/
-    └── ClientPacketListenerMixin.java # Chat, commandes, chat des autres, morts+position, joins/leaves
+    └── ClientPacketListenerMixin.java # Chat (sendChat + disguised), morts+position, morts mondiales, joins/leaves, advancements
 ```
 
 ### Détection des événements (packets 26.2)
@@ -132,8 +133,7 @@ src/main/java/fr/baguettemod/
 | Événement | Méthode mixinée | Packet |
 |---|---|---|
 | Votre chat | `ClientPacketListener.sendChat(String)` | — |
-| Vos commandes | `ClientPacketListener.sendCommand(String)` | — |
-| Chat des autres | `ClientPacketListener.handlePlayerChat` | `ClientboundPlayerChatPacket` |
+| Chat des autres | `ClientPacketListener.handleDisguisedChat` | `ClientboundDisguisedChatPacket` |
 | Mort (signal, à portée) | `ClientPacketListener.handleEntityEvent` | `ClientboundEntityEventPacket` (event 3) |
 | Source de la mort | `ClientPacketListener.handleDamageEvent` | `ClientboundDamageEventPacket` |
 | Mort mondiale (hors portée) | `ClientPacketListener.handleSystemChat` | `ClientboundSystemChatPacket` (clé `death.attack.*`) |
