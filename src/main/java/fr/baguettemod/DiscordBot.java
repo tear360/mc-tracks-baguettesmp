@@ -80,10 +80,6 @@ public class DiscordBot {
                 ":skull: " + deathMessage + "\n:pushpin: Position inconnue (joueur hors de portee de rendering).");
     }
 
-    public static void sendCommandMessage(String playerName, String command) {
-        sendMessage(Config.CHANNEL_COMMANDS, ":wrench: **[" + playerName + "]** " + command);
-    }
-
     public static void sendAdvancementMessage(String playerName, String advancement) {
         sendMessage(Config.CHANNEL_ADVANCEMENTS, ":trophy: **" + playerName + "** a obtenu " + advancement);
     }

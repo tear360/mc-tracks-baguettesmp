@@ -7,14 +7,13 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
+import net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket;
 import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
-import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,9 +28,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class ClientPacketListenerMixin {
     private static final byte DEATH_EVENT_ID = 3;
     private static final long DEATH_DEDUP_WINDOW_MS = 5000;
+    private static final long JOIN_LEAVE_DEDUP_WINDOW_MS = 3000;
     private static final Map<UUID, String> cachedPlayerNames = new ConcurrentHashMap<>();
     private static final Map<Integer, DamageSource> lastDamageSources = new ConcurrentHashMap<>();
     private static final Map<String, Long> reportedDeaths = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> recentJoins = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> recentLeaves = new ConcurrentHashMap<>();
 
     @Inject(method = "sendChat", at = @At("HEAD"))
     private void baguette_onSendChat(String message, CallbackInfo ci) {
@@ -41,29 +43,24 @@ public abstract class ClientPacketListenerMixin {
         BaguetteMod.LOGGER.info("[Chat -> Discord] <{}> {}", currentPlayerName(), message);
     }
 
-    @Inject(method = "sendCommand", at = @At("HEAD"))
-    private void baguette_onSendCommand(String command, CallbackInfo ci) {
+    @Inject(method = "handleDisguisedChat", at = @At("HEAD"))
+    private void baguette_onDisguisedChat(ClientboundDisguisedChatPacket packet, CallbackInfo ci) {
         if (!BaguetteMod.isActive()) return;
 
-        DiscordBot.sendCommandMessage(currentPlayerName(), "/" + command);
-        BaguetteMod.LOGGER.info("[Commande -> Discord] /{} (par {})", command, currentPlayerName());
-    }
-
-    @Inject(method = "handlePlayerChat", at = @At("HEAD"))
-    private void baguette_onPlayerChat(ClientboundPlayerChatPacket packet, CallbackInfo ci) {
-        if (!BaguetteMod.isActive()) return;
-
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.isLocalPlayer(packet.sender())) return;
-
-        Component text = packet.unsignedContent();
+        Component text = packet.message();
         if (text == null) return;
 
-        String senderName = cachedPlayerNames.get(packet.sender());
-        if (senderName == null) senderName = "?";
+        String full = text.getString();
+        if (full.startsWith("<") && full.contains(">")) {
+            int end = full.indexOf('>');
+            String senderName = full.substring(1, end).trim();
+            String message = full.substring(end + 1).trim();
 
-        DiscordBot.sendChatMessage(senderName, text.getString());
-        BaguetteMod.LOGGER.info("[Chat -> Discord] <{}> {}", senderName, text.getString());
+            if (senderName.isEmpty() || senderName.equals(currentPlayerName())) return;
+
+            DiscordBot.sendChatMessage(senderName, message);
+            BaguetteMod.LOGGER.info("[Chat -> Discord] <{}> {}", senderName, message);
+        }
     }
 
     @Inject(method = "handleDamageEvent", at = @At("HEAD"))
@@ -170,15 +167,18 @@ public abstract class ClientPacketListenerMixin {
         if (!packet.actions().contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) return;
 
         Minecraft minecraft = Minecraft.getInstance();
+        long now = System.currentTimeMillis();
 
         for (ClientboundPlayerInfoUpdatePacket.Entry entry : packet.newEntries()) {
             UUID id = entry.profileId();
             String name = entry.profile().name();
             cachedPlayerNames.put(id, name);
-            if (!minecraft.isLocalPlayer(id)) {
-                DiscordBot.sendJoinMessage(name);
-                BaguetteMod.LOGGER.info("[Join -> Discord] {}", name);
-            }
+            if (minecraft.isLocalPlayer(id)) continue;
+            if (recentJoins.getOrDefault(id, 0L) > now - JOIN_LEAVE_DEDUP_WINDOW_MS) continue;
+
+            recentJoins.put(id, now);
+            DiscordBot.sendJoinMessage(name);
+            BaguetteMod.LOGGER.info("[Join -> Discord] {}", name);
         }
     }
 
@@ -187,9 +187,13 @@ public abstract class ClientPacketListenerMixin {
         if (!BaguetteMod.isActive()) return;
 
         Minecraft minecraft = Minecraft.getInstance();
+        long now = System.currentTimeMillis();
 
         for (UUID id : packet.profileIds()) {
             if (minecraft.isLocalPlayer(id)) continue;
+            if (recentLeaves.getOrDefault(id, 0L) > now - JOIN_LEAVE_DEDUP_WINDOW_MS) continue;
+
+            recentLeaves.put(id, now);
             String name = cachedPlayerNames.remove(id);
             if (name == null) name = "joueur inconnu";
             DiscordBot.sendLeaveMessage(name);

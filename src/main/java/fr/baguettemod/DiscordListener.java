@@ -29,7 +29,6 @@ public class DiscordListener extends ListenerAdapter {
             if (message.startsWith("/")) {
                 String command = message.substring(1);
                 connection.sendCommand(command);
-                DiscordBot.sendCommandMessage(author, message);
                 BaguetteMod.LOGGER.info("[Discord -> MC] /{} (par {})", command, author);
             } else {
                 connection.sendChat("<[Discord] " + author + "> " + message);

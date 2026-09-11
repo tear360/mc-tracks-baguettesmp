@@ -13,7 +13,6 @@ public class Config {
     public static String CHANNEL_CHAT = "";
     public static String CHANNEL_JOINS = "";
     public static String CHANNEL_DEATHS = "";
-    public static String CHANNEL_COMMANDS = "";
     public static String CHANNEL_ADVANCEMENTS = "";
 
     public static void init() {
@@ -41,7 +40,6 @@ public class Config {
             CHANNEL_CHAT = props.getProperty("channel_chat", "");
             CHANNEL_JOINS = props.getProperty("channel_joins", "");
             CHANNEL_DEATHS = props.getProperty("channel_deaths", "");
-            CHANNEL_COMMANDS = props.getProperty("channel_commands", "");
             CHANNEL_ADVANCEMENTS = props.getProperty("channel_advancements", "");
 
             BaguetteMod.LOGGER.info("[BaguetteMod] Configuration chargee.");
@@ -60,7 +58,6 @@ public class Config {
         props.setProperty("channel_chat", "ID_DU_SALON_CHAT");
         props.setProperty("channel_joins", "ID_DU_SALON_JOINS");
         props.setProperty("channel_deaths", "ID_DU_SALON_DEATHS");
-        props.setProperty("channel_commands", "ID_DU_SALON_COMMANDS");
         props.setProperty("channel_advancements", "ID_DU_SALON_ADVANCEMENTS");
 
         try (FileOutputStream fos = new FileOutputStream(CONFIG_FILE.toFile())) {
