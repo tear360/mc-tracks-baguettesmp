@@ -77,7 +77,7 @@ public class DiscordBot {
                     .setAuthor(playerName, null, headUrl(playerName))
                     .setDescription(":red_circle: **" + playerName + "** a quitte le serveur.")
                     .setThumbnail(bodyUrl(playerName));
-            sendEmbed(Config.CHANNEL_JOINS, embed);
+            sendEmbed(leavesChannelId(), embed);
         } catch (Throwable t) {
             BaguetteMod.LOGGER.error("[BaguetteMod] Erreur sendLeaveMessage", t);
         }
@@ -137,6 +137,10 @@ public class DiscordBot {
         } catch (Throwable t) {
             BaguetteMod.LOGGER.error("[BaguetteMod] Erreur sendServerMessage", t);
         }
+    }
+
+    private static String leavesChannelId() {
+        return Config.CHANNEL_LEAVES.isEmpty() ? Config.CHANNEL_JOINS : Config.CHANNEL_LEAVES;
     }
 
     private static void sendEmbed(String channelId, EmbedBuilder embed) {

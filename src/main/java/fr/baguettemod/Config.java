@@ -12,6 +12,7 @@ public class Config {
     public static String DISCORD_TOKEN = "";
     public static String CHANNEL_CHAT = "";
     public static String CHANNEL_JOINS = "";
+    public static String CHANNEL_LEAVES = "";
     public static String CHANNEL_DEATHS = "";
     public static String CHANNEL_ADVANCEMENTS = "";
 
@@ -39,6 +40,7 @@ public class Config {
             DISCORD_TOKEN = props.getProperty("discord_token", "").trim();
             CHANNEL_CHAT = props.getProperty("channel_chat", "").trim();
             CHANNEL_JOINS = props.getProperty("channel_joins", "").trim();
+            CHANNEL_LEAVES = props.getProperty("channel_leaves", "").trim();
             CHANNEL_DEATHS = props.getProperty("channel_deaths", "").trim();
             CHANNEL_ADVANCEMENTS = props.getProperty("channel_advancements", "").trim();
 
@@ -57,6 +59,7 @@ public class Config {
         props.setProperty("discord_token", "METTRE_TOKEN_ICI");
         props.setProperty("channel_chat", "ID_DU_SALON_CHAT");
         props.setProperty("channel_joins", "ID_DU_SALON_JOINS");
+        props.setProperty("channel_leaves", "ID_DU_SALON_LEAVES");
         props.setProperty("channel_deaths", "ID_DU_SALON_DEATHS");
         props.setProperty("channel_advancements", "ID_DU_SALON_ADVANCEMENTS");
 

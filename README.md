@@ -11,7 +11,8 @@ Mod **Fabric** pour **Minecraft 26.2**, **CLIENT UNIQUEMENT**, qui relaye vers *
 | Chat de TOUS les joueurs | Salon chat | Chaque message envoyé est relayé (via `handleDisguisedChat` + `sendChat`) |
 | Discord → Minecraft | Salon chat | Un message du bot est envoyé dans le chat du serveur |
 | Discord → Commande | Salon chat | Un message commençant par `/` exécute la commande |
-| Connexions / Déconnexions mondiales | Salon joins | Joins/leaves de **tous** les joueurs (paquet PlayerInfo) |
+| Connexions mondiales | Salon joins | Joins de **tous** les joueurs (paquet PlayerInfo) |
+| Déconnexions mondiales | Salon leaves | Leaves de **tous** les joueurs (paquet PlayerInfo) |
 | **Morts mondiales** | Salon deaths | La mort de **tout joueur** est relayée |
 | Morts avec position | Salon deaths | Si le joueur est dans le rayon de rendu : `X Y Z` + dimension |
 | Advancements mondiaux | Salon advancements | Les progrès de **tous** les joueurs sont relayés |
@@ -71,9 +72,12 @@ discord_token=METTRE_TOKEN_ICI
 # IDs des salons Discord (le bot doit y avoir accès)
 channel_chat=ID_DU_SALON_CHAT
 channel_joins=ID_DU_SALON_JOINS
+channel_leaves=ID_DU_SALON_LEAVES
 channel_deaths=ID_DU_SALON_DEATHS
 channel_advancements=ID_DU_SALON_ADVANCEMENTS
 ```
+
+> Si `channel_leaves` est vide, les déconnexions partent dans `channel_joins`.
 
 > Mode développeur Discord requis pour copier les IDs des salons (Paramètres → Avancé → Mode développeur).
 
@@ -88,11 +92,13 @@ Au lancement, le mod vérifie l'API GitHub
 (`https://api.github.com/repos/tear360/mc-tracks-baguettesmp/releases/latest`).
 
 - **Version à jour** → rien ne se passe.
-- **Nouvelle version** → le jar est téléchargé dans `mods/baguette-server-bot-update.jar`.
-  Au prochain arrêt de Minecraft, l'ancien jar est remplacé automatiquement (sinon un message indique le renommage manuel).
+- **Nouvelle version** → le jar est téléchargé dans `mods/baguette-server-bot-update.jar.part`.
+  - Au **propre arrêt** de Minecraft, le jar est remplacé automatiquement.
+  - Sur **Windows** (jar verrouillé en mémoire), un script `mods/baguette-swap.bat` est lancé :
+    il attend la fermeture complète de Minecraft, supprime l'ancien jar et renomme la mise à jour.
 
-> Windows peut verrouiller le jar en cours d'utilisation : si le remplacement automatique échoue,
-> supprimez l'ancien mod et renommez `baguette-server-bot-update.jar` en `baguette-server-bot-<version>.jar`.
+> Si Minecraft est tué brutalement (crash, kill), vérifiez qu'il ne reste pas un
+> `-update.jar.part` dans `mods/` : supprimez-le ou appliquez le renommage à la main.
 
 ## Développement
 
