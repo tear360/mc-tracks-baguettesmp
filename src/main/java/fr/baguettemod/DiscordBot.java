@@ -168,7 +168,7 @@ public class DiscordBot {
         if (playerName == null || playerName.isEmpty()) return null;
         try {
             String encoded = URLEncoder.encode(playerName, StandardCharsets.UTF_8);
-            return "https://mc-heads.net/avatar/" + encoded + "/64";
+            return "https://render.crafty.gg/3d/head/" + encoded + "?width=96&height=96";
         } catch (Throwable t) {
             return null;
         }
@@ -178,7 +178,7 @@ public class DiscordBot {
         if (playerName == null || playerName.isEmpty()) return null;
         try {
             String encoded = URLEncoder.encode(playerName, StandardCharsets.UTF_8);
-            return "https://mc-heads.net/body/" + encoded + "/110";
+            return "https://render.crafty.gg/3d/bust/" + encoded + "?width=300&height=360&x=-30&z=50";
         } catch (Throwable t) {
             return null;
         }
