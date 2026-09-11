@@ -75,6 +75,11 @@ public class DiscordBot {
                 ":skull: " + deathMessage + "\n:round_pushpin: **Position de la mort :** `" + x + ", " + y + ", " + z + "` (" + dim + ")");
     }
 
+    public static void sendDeathMessage(String deathMessage) {
+        sendMessage(Config.CHANNEL_DEATHS,
+                ":skull: " + deathMessage + "\n:pushpin: Position inconnue (joueur hors de portee de rendering).");
+    }
+
     public static void sendCommandMessage(String playerName, String command) {
         sendMessage(Config.CHANNEL_COMMANDS, ":wrench: **[" + playerName + "]** " + command);
     }

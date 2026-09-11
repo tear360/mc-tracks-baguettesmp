@@ -5,11 +5,13 @@ import fr.baguettemod.DiscordBot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -26,8 +28,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Mixin(ClientPacketListener.class)
 public abstract class ClientPacketListenerMixin {
     private static final byte DEATH_EVENT_ID = 3;
+    private static final long DEATH_DEDUP_WINDOW_MS = 5000;
     private static final Map<UUID, String> cachedPlayerNames = new ConcurrentHashMap<>();
     private static final Map<Integer, DamageSource> lastDamageSources = new ConcurrentHashMap<>();
+    private static final Map<String, Long> reportedDeaths = new ConcurrentHashMap<>();
 
     @Inject(method = "sendChat", at = @At("HEAD"))
     private void baguette_onSendChat(String message, CallbackInfo ci) {
@@ -100,8 +104,64 @@ public abstract class ClientPacketListenerMixin {
         int y = player.getBlockY();
         int z = player.getBlockZ();
 
+        reportedDeaths.put(player.getName().getString(), System.currentTimeMillis());
+
         BaguetteMod.LOGGER.info("[Mort -> Discord] {} (X:{}, Y:{}, Z:{}, {})", deathMessage, x, y, z, dimension);
         DiscordBot.sendDeathMessage(deathMessage, x, y, z, dimension);
+    }
+
+    @Inject(method = "handleSystemChat", at = @At("HEAD"))
+    private void baguette_onSystemChat(ClientboundSystemChatPacket packet, CallbackInfo ci) {
+        if (!BaguetteMod.isActive()) return;
+
+        Component content = packet.content();
+        if (content == null) return;
+        if (!(content.getContents() instanceof TranslatableContents translatable)) return;
+
+        String key = translatable.getKey();
+        if (key == null) return;
+
+        if (key.startsWith("death.")) {
+            long now = System.currentTimeMillis();
+            String victim = firstArgAsComponentName(translatable, "un joueur");
+
+            Long lastReport = reportedDeaths.get(victim);
+            if (lastReport != null && now - lastReport < DEATH_DEDUP_WINDOW_MS) {
+                return;
+            }
+            reportedDeaths.put(victim, now);
+
+            String deathMessage = content.getString();
+            BaguetteMod.LOGGER.info("[Mort (monde) -> Discord] {}", deathMessage);
+            DiscordBot.sendDeathMessage(deathMessage);
+        } else if (key.startsWith("chat.type.advancement.")) {
+            String player = argAsString(translatable, 0, "un joueur");
+            String advancement = argAsString(translatable, 1, "un progres");
+            BaguetteMod.LOGGER.info("[Progres (monde) -> Discord] {} a obtenu {}", player, advancement);
+            DiscordBot.sendAdvancementMessage(player, advancement);
+        }
+    }
+
+    private static String firstArgAsComponentName(TranslatableContents translatable, String fallback) {
+        Object[] args = translatable.getArgs();
+        if (args != null && args.length > 0 && args[0] != null) {
+            if (args[0] instanceof Component component) {
+                return component.getString();
+            }
+            return String.valueOf(args[0]);
+        }
+        return fallback;
+    }
+
+    private static String argAsString(TranslatableContents translatable, int index, String fallback) {
+        Object[] args = translatable.getArgs();
+        if (args != null && index < args.length && args[index] != null) {
+            if (args[index] instanceof Component component) {
+                return component.getString();
+            }
+            return String.valueOf(args[index]);
+        }
+        return fallback;
     }
 
     @Inject(method = "handlePlayerInfoUpdate", at = @At("HEAD"))
