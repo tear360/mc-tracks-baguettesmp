@@ -33,16 +33,17 @@ La commande slash `/horaires` est disponible dans **le serveur Discord du salon 
 
 Plus le mod tourne longtemps et souvent, plus les plages deviennent fiables.
 
-> **Position de mort** : le mod interprète côté client le packet `ClientboundEntityEventPacket` (event 3 = mort) et le packet
-> `ClientboundDamageEventPacket` (source du coup), puis calcule `X Y Z` via `entity.blockPosition()`. Aucun joueur n'a
-> besoin d'être **OP**.
+> **Position de mort** : le mod interprète côté client le packet `ClientboundEntityEventPacket` (event 3 = mort),
+> puis calcule `X Y Z` via `entity.blockPosition()`. Aucun joueur n'a besoin d'être **OP**.
 >
 > **Morts hors rayon de rendu** : chaque mort étant diffusée à tous les joueurs via `ClientboundSystemChatPacket`
 > (clé `death.attack.*`), le mod la capte aussi — mais **sans position** (inconnaissable en client-only).
-> Une déduplication de 5 s évite les doublons avec l'event d'entité (qui, lui, porte la position et arrive en premier).
+> Une **déduplication de 5 s** + un envoi unique retardé (~0,8 s) garantissent **un seul message Discord par mort**,
+> même quand l'event d'entité et le chat système arrivent dans un ordre différent.
 >
-> **Chat des autres joueurs** : le serveur envoie le chat des autres en *disguised chat*
-> (`ClientboundDisguisedChatPacket`) — le mod les parse (`<nom> message`) et les relaye.
+> **Chat des autres joueurs** : selon le serveur, le chat arrive en *disguised chat*
+> (`ClientboundDisguisedChatPacket`, parsé `<nom> message`) ou en message **signé**
+> (`handlePlayerChat`/`ClientboundPlayerChatPacket`) — le mod gère les deux.
 >
 > ⚠️ Limites inhérentes au client-only : les **commandes des autres joueurs** ne sont pas visibles, et la
 > **position de mort** n'existe que pour les joueurs dans le rayon de rendu.

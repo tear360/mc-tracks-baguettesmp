@@ -7,13 +7,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
-import net.minecraft.network.protocol.game.ClientboundDamageEventPacket;
 import net.minecraft.network.protocol.game.ClientboundDisguisedChatPacket;
 import net.minecraft.network.protocol.game.ClientboundEntityEventPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoRemovePacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
-import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,8 +21,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Mixin(ClientPacketListener.class)
 public abstract class ClientPacketListenerMixin {
@@ -31,10 +34,21 @@ public abstract class ClientPacketListenerMixin {
     private static final long DEATH_DEDUP_WINDOW_MS = 5000;
     private static final long JOIN_LEAVE_DEDUP_WINDOW_MS = 3000;
     private static final Map<UUID, String> cachedPlayerNames = new ConcurrentHashMap<>();
-    private static final Map<Integer, DamageSource> lastDamageSources = new ConcurrentHashMap<>();
     private static final Map<String, Long> reportedDeaths = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> recentJoins = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> recentLeaves = new ConcurrentHashMap<>();
+    private static final Map<String, Long> recentChats = new ConcurrentHashMap<>();
+    private static final long CHAT_DEDUP_WINDOW_MS = 2000;
+    private static final long DEATH_POSITION_WINDOW_MS = 5000;
+    private static final long DEATH_SEND_DELAY_MS = 800;
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "baguette-death");
+
+        t.setDaemon(true);
+        return t;
+    });
+    private static final Map<String, DeathPosition> pendingDeathPositions = new ConcurrentHashMap<>();
+    private static final Map<String, String> pendingDeathMessages = new ConcurrentHashMap<>();
 
     @Inject(method = "sendChat", at = @At("HEAD"))
     private void baguette_onSendChat(String message, CallbackInfo ci) {
@@ -58,24 +72,73 @@ public abstract class ClientPacketListenerMixin {
             String message = full.substring(end + 1).trim();
 
             if (senderName.isEmpty() || senderName.equals(currentPlayerName())) return;
+            if (!checkChatDedup(senderName, message)) return;
 
             DiscordBot.sendChatMessage(senderName, message);
             BaguetteMod.LOGGER.info("[Chat -> Discord] <{}> {}", senderName, message);
+        } else if (!full.isEmpty() && seenUnknownChatFormats.add(full.length() > 60 ? full.substring(0, 60) : full)) {
+            BaguetteMod.LOGGER.info("[Chat] Format non reconnu (1x): '{}'", full);
         }
     }
 
-    @Inject(method = "handleDamageEvent", at = @At("HEAD"))
-    private void baguette_onDamageEvent(ClientboundDamageEventPacket packet, CallbackInfo ci) {
+    private static final Set<String> seenUnknownChatFormats = ConcurrentHashMap.newKeySet();
+
+    @Inject(method = "handlePlayerChat", at = @At("HEAD"))
+    private void baguette_onPlayerChat(ClientboundPlayerChatPacket packet, CallbackInfo ci) {
         if (!BaguetteMod.isActive()) return;
+        if (packet == null) return;
+
+        UUID senderId = packet.sender();
+        if (senderId == null) return;
 
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) return;
+        if (minecraft.isLocalPlayer(senderId)) return;
 
-        Entity entity = minecraft.level.getEntity(packet.entityId());
-        if (entity instanceof Player) {
-            lastDamageSources.put(entity.getId(), packet.getSource(minecraft.level));
+        String senderName = cachedPlayerNames.get(senderId);
+        if (senderName == null || senderName.isEmpty()) return;
+
+        String message = null;
+        if (packet.body() != null && packet.body().content() != null) {
+            message = packet.body().content();
         }
+        if (message == null || message.isEmpty()) return;
+
+        if (!checkChatDedup(senderName, message)) return;
+
+        DiscordBot.sendChatMessage(senderName, message);
+        BaguetteMod.LOGGER.info("[Chat signe -> Discord] <{}> {}", senderName, message);
     }
+
+    private static boolean checkChatDedup(String senderName, String message) {
+        long now = System.currentTimeMillis();
+        String key = senderName + "\u0000" + message;
+        Long last = recentChats.get(key);
+        if (last != null && now - last < CHAT_DEDUP_WINDOW_MS) return false;
+        recentChats.put(key, now);
+        return true;
+    }
+
+    private static void scheduleDeathSend(String victim) {
+        SCHEDULER.schedule(() -> {
+            try {
+                long now = System.currentTimeMillis();
+                DeathPosition pos = pendingDeathPositions.remove(victim);
+                String deathMessage = pendingDeathMessages.remove(victim);
+                if (deathMessage == null || deathMessage.isEmpty()) {
+                    deathMessage = victim + " est mort";
+                }
+                if (pos != null && now - pos.time <= DEATH_POSITION_WINDOW_MS) {
+                    DiscordBot.sendDeathMessage(deathMessage, victim, pos.x, pos.y, pos.z, pos.dimension);
+                } else {
+                    DiscordBot.sendDeathMessage(deathMessage, victim);
+                }
+            } catch (Throwable t) {
+                BaguetteMod.LOGGER.error("[BaguetteMod] Erreur scheduleDeathSend", t);
+            }
+        }, DEATH_SEND_DELAY_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private record DeathPosition(int x, int y, int z, String dimension, long time) {}
 
     @Inject(method = "handleEntityEvent", at = @At("HEAD"))
     private void baguette_onEntityEvent(ClientboundEntityEventPacket packet, CallbackInfo ci) {
@@ -89,23 +152,31 @@ public abstract class ClientPacketListenerMixin {
         Entity entity = packet.getEntity(minecraft.level);
         if (!(entity instanceof Player player)) return;
 
-        DamageSource source = lastDamageSources.remove(entity.getId());
-        String deathMessage;
-        if (source != null) {
-            deathMessage = source.getLocalizedDeathMessage(player).getString();
-        } else {
-            deathMessage = player.getName().getString() + " est mort";
+        long now = System.currentTimeMillis();
+        String victim = player.getName().getString();
+
+        DeathPosition pos = new DeathPosition(
+                player.getBlockX(),
+                player.getBlockY(),
+                player.getBlockZ(),
+                player.level().dimension().identifier().toString(),
+                now
+        );
+        pendingDeathPositions.put(victim, pos);
+        pendingDeathMessages.putIfAbsent(victim, sourceDeathMessage(player));
+
+        Long lastReport = reportedDeaths.get(victim);
+        if (lastReport != null && now - lastReport < DEATH_DEDUP_WINDOW_MS) {
+            return;
         }
+        reportedDeaths.put(victim, now);
 
-        String dimension = player.level().dimension().identifier().toString();
-        int x = player.getBlockX();
-        int y = player.getBlockY();
-        int z = player.getBlockZ();
+        BaguetteMod.LOGGER.info("[Mort -> position] {} (X:{}, Y:{}, Z:{}, {})", victim, pos.x, pos.y, pos.z, pos.dimension);
+        scheduleDeathSend(victim);
+    }
 
-        reportedDeaths.put(player.getName().getString(), System.currentTimeMillis());
-
-        BaguetteMod.LOGGER.info("[Mort -> Discord] {} (X:{}, Y:{}, Z:{}, {})", deathMessage, x, y, z, dimension);
-        DiscordBot.sendDeathMessage(deathMessage, player.getName().getString(), x, y, z, dimension);
+    private static String sourceDeathMessage(Player player) {
+        return player.getName().getString() + " est mort";
     }
 
     @Inject(method = "handleSystemChat", at = @At("HEAD"))
@@ -123,15 +194,17 @@ public abstract class ClientPacketListenerMixin {
             long now = System.currentTimeMillis();
             String victim = firstArgAsComponentName(translatable, "un joueur");
 
+            String deathMessage = content.getString();
+            pendingDeathMessages.put(victim, deathMessage);
+
             Long lastReport = reportedDeaths.get(victim);
             if (lastReport != null && now - lastReport < DEATH_DEDUP_WINDOW_MS) {
                 return;
             }
             reportedDeaths.put(victim, now);
 
-            String deathMessage = content.getString();
             BaguetteMod.LOGGER.info("[Mort (monde) -> Discord] {} (par {})", deathMessage, victim);
-            DiscordBot.sendDeathMessage(deathMessage, victim);
+            scheduleDeathSend(victim);
         } else if (key.startsWith("chat.type.advancement.")) {
             String player = argAsString(translatable, 0, "un joueur");
             String advancement = argAsString(translatable, 1, "un progres");
